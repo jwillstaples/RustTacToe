@@ -1,3 +1,5 @@
+use std::io; 
+
 struct GameState {
 
     board: [[[bool; 2]; 3]; 3],
@@ -7,10 +9,10 @@ struct GameState {
 
 impl GameState { 
 
-    fn winning_position(&self) -> bool { 
+    fn losing_position(&self) -> bool { 
         // returns true if position is won
 
-        let mover_index = if self.mover {1} else {0};
+        let mover_index = if self.mover {0} else {1};
         
         for i in vec![0, 1, 2] {
             // check horizontal
@@ -32,6 +34,10 @@ impl GameState {
         }
 
         return false;
+    }
+
+    fn full_board(&self) -> bool { 
+        return ! self.legal_moves().iter().any(|&x|x)
     }
 
     fn print_board(&self) {
@@ -66,6 +72,39 @@ impl GameState {
         return new_game_state; 
     }
 
+    fn legal_moves(&self) -> [bool; 9] { 
+
+        let mut legals = [true; 9];
+
+        for mv in 0..9 { 
+            if self.board[mv/3][mv%3][0] || self.board[mv/3][mv%3][1] { 
+                legals[mv] = false;
+            }
+        }
+        return legals;
+    }
+
+    fn minimax(&self) -> (usize, i8) { 
+
+        if self.losing_position() { 
+            return (0, -1); 
+        } else if ! self.legal_moves().iter().any(|&x|x) { 
+            return (0, 0);
+        }
+
+        let mut child_scores = [0; 9];
+        let legals = self.legal_moves();
+
+        for mv in 0..9 {  
+            if legals[mv] { 
+                let (_, score) = self.move_from_int(mv).minimax();
+                child_scores[mv] = -score; 
+            } else { 
+                child_scores[mv] = -2; 
+            }
+        }
+        return child_scores.into_iter().enumerate().max_by_key(|(_, num)| *num).unwrap()
+    }
 }
 
 fn starting_state() -> GameState { 
@@ -79,7 +118,31 @@ fn starting_state() -> GameState {
 
 fn main(){ 
 
-    let game_state = starting_state(); 
-    game_state.print_board(); 
+    let mut game_state = starting_state(); 
 
+    loop { 
+
+        game_state.print_board();
+
+        let mut mv = 0; 
+        let mut eval = 0; 
+
+        if game_state.mover {
+            (mv, eval) = game_state.minimax(); 
+        } else {
+            println!("Accepting move: ");
+            let mut input = String::new(); 
+            std::io::stdin().read_line(&mut input).unwrap();
+            let input = input.trim();
+            mv = input.parse().unwrap(); 
+        }
+
+        game_state = game_state.move_from_int(mv);
+
+        if game_state.losing_position() || game_state.full_board(){ 
+            game_state.print_board();
+            break
+        }
+
+    }
 }
